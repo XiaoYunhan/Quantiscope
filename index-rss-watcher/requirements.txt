@@ -1,0 +1,4 @@
+aiohttp==3.9.*
+feedparser==6.0.*
+python-dotenv==1.0.*
+twilio==9.*
