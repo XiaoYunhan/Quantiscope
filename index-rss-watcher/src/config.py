@@ -1,6 +1,11 @@
 from dotenv import load_dotenv
 from pathlib import Path
 import os
+import warnings
+
+# Suppress SSL/urllib3 warnings
+warnings.filterwarnings("ignore", message="urllib3.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env", override=False)
 
