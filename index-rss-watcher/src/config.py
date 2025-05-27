@@ -11,7 +11,6 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env", override=False)
 
 FEED_URL          = os.getenv("FEED_URL", "https://www.spglobal.com/spdji/en/rss/rss-details/?rssFeedName=index-news-announcements")
 POLL_INTERVAL_SEC = int(os.getenv("POLL_INTERVAL_SEC", 30))      # 轮询间隔
-DB_PATH           = os.getenv("DB_PATH",   "./rss_state.db")
 
 # Twilio
 TWILIO_SID        = os.getenv("TWILIO_SID")

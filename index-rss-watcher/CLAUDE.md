@@ -34,13 +34,14 @@ cp .env.template .env
 
 ### Deployment
 ```bash
-# Docker
-docker build -t index-rss-watcher .
-docker run -d --name rss-watcher --env-file .env index-rss-watcher
-
 # systemd (Linux)
 sudo cp deploy/index-rss.service /etc/systemd/system/
-sudo systemctl enable index-rss && sudo systemctl start index-rss
+sudo systemctl daemon-reload
+sudo systemctl enable index-rss
+sudo systemctl start index-rss
+
+# Check status
+sudo systemctl status index-rss
 ```
 
 ## Architecture Overview
@@ -70,10 +71,10 @@ This is an asyncio-based RSS monitoring service that watches S&P Global index fe
 
 ### RSS Filtering Logic
 
-The service uses layered pattern matching:
-1. Basic pattern: constituent|addition|deletion|changes|announced|effective|removed|added|replacing|replaced
-2. Index-specific patterns: "S&P" + change terms, "Dow" + change terms, etc.
-3. Multiple content fields checked: title, summary, description
+The service uses a simple filter:
+1. Checks if the description field contains "replace" (case-insensitive)
+2. Only sends notifications for items with replacements
+3. Sends the complete item content including full description
 
 ### Configuration Notes
 
@@ -93,6 +94,17 @@ The service uses layered pattern matching:
 
 ### Testing Strategy
 
-- test_watcher.py: Tests RSS processing with mock data, validates filtering logic
-- test_twilio.py: Tests credential validation and notification delivery (with test mode)
-- Both tests can run without real RSS feeds or Twilio credentials
+- test.py: Comprehensive test suite that includes:
+  - RSS feed access and processing tests
+  - Pattern matching and filtering logic validation
+  - CSV storage functionality tests
+  - Twilio notification system tests (with test mode)
+- Tests can run without real RSS feeds or Twilio credentials
+- Creates temporary test data that's cleaned up after test completion
+
+### Data Storage
+
+- Seen RSS entries are stored in `data/seen_entries.csv`
+- CSV format: timestamp, entry_id, title, link
+- Human-readable format makes debugging easy
+- No database dependencies, simplifying deployment

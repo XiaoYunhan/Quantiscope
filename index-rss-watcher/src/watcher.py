@@ -1,28 +1,54 @@
-import asyncio, re, aiohttp, feedparser, logging
-from typing import Optional, List
+import asyncio, re, aiohttp, feedparser, logging, csv, os
+from typing import Optional, List, Set
+from datetime import datetime
 from .config import FEED_URL, POLL_INTERVAL_SEC
-from .store  import EntryStore
 from .notifier import Notifier
 
 log = logging.getLogger("watcher")
 
-# Enhanced pattern for index component changes
-PATTERN = re.compile(r"(constituent|addition|deletion|changes?|announced?|effective|removed?|added|replacing|replaced)", re.I)
-
-# More specific patterns for index changes
-INDEX_CHANGE_PATTERNS = [
-    re.compile(r"index.*(addition|deletion|constituent|change)", re.I),
-    re.compile(r"(addition|deletion).*(index|constituent)", re.I),
-    re.compile(r"(s&p|dow|russell|ftse).*(change|addition|deletion|constituent)", re.I),
-    re.compile(r"effective.*(addition|deletion|change)", re.I),
-    re.compile(r"announced.*(addition|deletion|change)", re.I)
-]
+# Simple pattern to find "replace" in description
+REPLACE_PATTERN = re.compile(r"replac", re.I)
 
 class FeedWatcher:
-    def __init__(self, store: EntryStore):
-        self.store = store
+    def __init__(self):
         self.etag: Optional[str] = None
         self.modified: Optional[str] = None
+        self.csv_path = "data/seen_entries.csv"
+        self.seen_ids: Set[str] = self._load_seen_entries()
+        
+    def _load_seen_entries(self) -> Set[str]:
+        """Load previously seen entry IDs from CSV"""
+        seen = set()
+        if os.path.exists(self.csv_path):
+            try:
+                with open(self.csv_path, 'r', newline='') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        seen.add(row['entry_id'])
+                log.info(f"Loaded {len(seen)} previously seen entries")
+            except Exception as e:
+                log.error(f"Error loading CSV: {e}")
+        return seen
+    
+    def _save_entry(self, entry_id: str, title: str, link: str) -> None:
+        """Save a new entry to CSV"""
+        file_exists = os.path.exists(self.csv_path)
+        
+        with open(self.csv_path, 'a', newline='') as f:
+            fieldnames = ['timestamp', 'entry_id', 'title', 'link']
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            
+            if not file_exists:
+                writer.writeheader()
+            
+            writer.writerow({
+                'timestamp': datetime.now().isoformat(),
+                'entry_id': entry_id,
+                'title': title,
+                'link': link
+            })
+        
+        self.seen_ids.add(entry_id)
         
     async def test_feed_access(self) -> bool:
         """Test if RSS feed is accessible"""
@@ -35,49 +61,43 @@ class FeedWatcher:
                 return False
 
     async def _fetch(self, session: aiohttp.ClientSession) -> bytes:
+        # Use the working headers based on your test results
         hdrs = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/rss+xml, application/xml, text/xml',
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
+            'Connection': 'keep-alive'
         }
         if self.etag:      hdrs["If-None-Match"]   = self.etag
         if self.modified:  hdrs["If-Modified-Since"] = self.modified
         
-        # Try multiple potential RSS URLs
-        urls_to_try = [
-            FEED_URL,
-            'https://www.spglobal.com/spdji/en/rss/rss-details/?rssFeedName=index-news-announcements.xml',
-            'https://www.spglobal.com/spdji/en/rss/index-news-announcements.xml',
-            'https://www.spglobal.com/spdji/en/rss/index-news-announcements',
-            'https://investor.spglobal.com/feeds/rss/index-news.xml'
-        ]
+        # Focus on the single working URL based on your test
+        url = FEED_URL
         
-        for url in urls_to_try:
-            try:
-                async with session.get(url, headers=hdrs, timeout=30) as resp:
-                    log.info(f"Trying URL: {url} - Status: {resp.status}")
-                    if resp.status == 304:  # No new content
-                        return b""
-                    elif resp.status == 200:
-                        self.etag     = resp.headers.get("ETag", self.etag)
-                        self.modified = resp.headers.get("Last-Modified", self.modified)
-                        data = await resp.read()
-                        log.info(f"Successfully fetched from {url}, {len(data)} bytes")
-                        return data
-                    elif resp.status == 403:
-                        log.warning(f"Access denied to {url}")
-                        continue
-                    else:
-                        log.warning(f"HTTP {resp.status} for {url}")
-                        continue
-            except Exception as e:
-                log.warning(f"Error fetching {url}: {e}")
-                continue
-        
-        raise Exception("All RSS URLs failed")
+        try:
+            async with session.get(url, headers=hdrs, timeout=30) as resp:
+                log.info(f"Fetching RSS from: {url} - Status: {resp.status}")
+                
+                if resp.status == 304:  # No new content
+                    log.info("No new content (304 Not Modified)")
+                    return b""
+                elif resp.status == 200:
+                    self.etag     = resp.headers.get("ETag", self.etag)
+                    self.modified = resp.headers.get("Last-Modified", self.modified)
+                    data = await resp.read()
+                    log.info(f"Successfully fetched RSS feed, {len(data)} bytes")
+                    return data
+                elif resp.status == 403:
+                    log.error(f"Access denied (403) to {url} - check robots.txt compliance")
+                    raise Exception(f"RSS feed access denied: {resp.status}")
+                else:
+                    log.error(f"HTTP {resp.status} from {url}")
+                    raise Exception(f"RSS feed error: HTTP {resp.status}")
+                    
+        except Exception as e:
+            log.error(f"Failed to fetch RSS feed: {e}")
+            raise
 
     async def run_forever(self):
         log.info(f"Starting RSS watcher with {POLL_INTERVAL_SEC}s interval")
@@ -121,41 +141,34 @@ class FeedWatcher:
         
         for entry in feed.entries:
             entry_id = getattr(entry, 'id', entry.link)
-            if self.store.is_seen(entry_id):
+            if entry_id in self.seen_ids:
                 continue
                 
-            # Check multiple content fields for index changes
-            content_to_check = [
-                getattr(entry, 'title', ''),
-                getattr(entry, 'summary', ''),
-                getattr(entry, 'description', '')
-            ]
+            # Check if description contains "replace"
+            description = getattr(entry, 'description', '')
             
-            content_text = ' '.join(content_to_check).lower()
-            
-            # Use enhanced pattern matching
-            is_index_change = any(pattern.search(content_text) for pattern in INDEX_CHANGE_PATTERNS)
-            
-            if is_index_change or PATTERN.search(content_text):
-                # Extract more detailed information
-                summary = getattr(entry, 'summary', '')[:200] + '...' if hasattr(entry, 'summary') else ''
+            if REPLACE_PATTERN.search(description):
+                # Send the entire item content
+                title = getattr(entry, 'title', 'No title')
                 published = getattr(entry, 'published', 'Unknown date')
+                link = getattr(entry, 'link', '')
                 
-                text = f"🚨 Index Change Alert\n" \
-                       f"Title: {entry.title}\n" \
-                       f"Published: {published}\n" \
-                       f"Summary: {summary}\n" \
-                       f"Link: {entry.link}"
+                # Send full item details
+                text = f"🚨 Index Change Alert\n\n" \
+                       f"Title: {title}\n\n" \
+                       f"Published: {published}\n\n" \
+                       f"Description:\n{description}\n\n" \
+                       f"Link: {link}"
                 
                 try:
                     success = Notifier.send(text)
                     if success:
-                        log.info("Notified: %s", entry.title)
+                        log.info("Notified: %s", title)
                     else:
-                        log.error("Failed to send notification for: %s", entry.title)
+                        log.error("Failed to send notification for: %s", title)
                 except Exception as e:
                     log.exception("Notify error: %s", e)
             else:
-                log.debug(f"Skipping non-index entry: {entry.title}")
+                log.debug(f"Skipping entry (no 'replace' in description): {entry.title}")
                 
-            self.store.mark_seen(entry_id)
+            self._save_entry(entry_id, entry.title, entry.link)

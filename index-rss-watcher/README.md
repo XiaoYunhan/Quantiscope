@@ -4,12 +4,12 @@ A robust Python service that monitors S&P Global index RSS feeds for constituent
 
 ## Features
 
-- = **Smart RSS Monitoring**: Monitors S&P Global index news with intelligent filtering for constituent changes
-- =Ò **Multi-Channel Notifications**: Send alerts via SMS or voice calls using Twilio
-- =Ä **High Performance**: Optimized feed parsing with conditional requests and connection pooling
-- =æ **Persistent State**: SQLite database to track processed entries and prevent duplicates
-- =· **Robust Error Handling**: Comprehensive error handling with retry logic and backoff
-- ° **Fast Response**: Average processing time under 3ms per feed
+- üîç **Smart RSS Monitoring**: Monitors S&P Global index news with intelligent filtering for constituent changes
+- üì± **Multi-Channel Notifications**: Send alerts via SMS or voice calls using Twilio
+- ‚ö° **High Performance**: Optimized feed parsing with conditional requests and connection pooling
+- üìÑ **Persistent State**: CSV file to track processed entries and prevent duplicates
+- üõ°Ô∏è **Robust Error Handling**: Comprehensive error handling with retry logic and backoff
+- üöÄ **Fast Response**: Average processing time under 3ms per feed
 
 ## Quick Start
 
@@ -53,15 +53,45 @@ cd src && python3 main.py
 
 ## Testing
 
-### Test RSS Feed Processing
+### Run Complete Test Suite
 ```bash
-python3 test_watcher.py
+python3 test.py
 ```
 
-### Test Twilio Notifications
+This comprehensive test suite validates:
+- RSS feed access and processing
+- Pattern matching for index changes
+- CSV storage functionality  
+- Notification system (in test mode)
+
+### Testing Approach
+
+1. **Unit Tests**: The test suite includes mock RSS data to test filtering logic without network access
+2. **Integration Tests**: Tests actual RSS feed fetching when network is available
+3. **Performance Tests**: Validates processing speed and notification performance
+4. **Data Persistence**: Verifies CSV storage and loading functionality
+
+### Manual Testing
+
+To manually test the service:
+
 ```bash
-python3 test_twilio.py
+# Test with live RSS feed (will send real notifications if configured)
+python3 -m src.main &
+pid=$!
+sleep 5  # Let it run for a few seconds
+kill -INT $pid  # Graceful shutdown
+
+# Check the CSV file for processed entries
+cat data/seen_entries.csv
 ```
+
+### Continuous Integration
+
+The project includes GitHub Actions workflow (`.github/workflows/test.yml`) that:
+- Tests on Python 3.8, 3.9, 3.10, 3.11, and 3.12
+- Runs the complete test suite on every push and PR
+- Validates module imports
 
 ## Configuration Options
 
@@ -69,7 +99,6 @@ python3 test_twilio.py
 |----------|-------------|---------|
 | `FEED_URL` | RSS feed URL to monitor | S&P Global index news |
 | `POLL_INTERVAL_SEC` | Polling interval in seconds | 30 |
-| `DB_PATH` | SQLite database path | `./rss_state.db` |
 | `TWILIO_SID` | Twilio Account SID | Required for notifications |
 | `TWILIO_TOKEN` | Twilio Auth Token | Required for notifications |
 | `TWILIO_FROM` | Twilio phone number | Required for notifications |
@@ -95,32 +124,36 @@ sudo systemctl start index-rss
 sudo systemctl status index-rss
 ```
 
-### Using Docker
-
-```bash
-# Build image
-docker build -t index-rss-watcher .
-
-# Run container
-docker run -d --name rss-watcher \
-  --env-file .env \
-  index-rss-watcher
-```
-
 ## How It Works
 
 1. **RSS Monitoring**: Polls the S&P Global RSS feed every 30 seconds using conditional HTTP requests
 2. **Content Filtering**: Uses multiple regex patterns to identify index constituent changes
-3. **Duplicate Prevention**: SQLite database tracks processed entries by ID
+3. **Duplicate Prevention**: CSV file (data/seen_entries.csv) tracks processed entries by ID
 4. **Notification Delivery**: Sends formatted alerts via Twilio SMS or voice calls
 5. **Error Recovery**: Automatic retry with exponential backoff on failures
 
 ## Filtering Logic
 
-The service identifies index changes using these patterns:
-- Explicit terms: "constituent", "addition", "deletion", "changes"
-- Index-specific: "S&P", "Dow", "Russell", "FTSE" + change terms
-- Action terms: "effective", "announced", "added", "removed", "replacing"
+The service uses a simple and effective filter:
+- Only monitors RSS items that contain "replace" in the description
+- This captures index constituent replacements (e.g., "Company A will replace Company B")
+- Sends the complete item details including full description
+
+## Data Storage
+
+- Processed entries are stored in `data/seen_entries.csv`
+- CSV format: `timestamp,entry_id,title,link`
+- Human-readable format for easy debugging
+- Creates data directory automatically on first run
+
+## Logs
+
+The service logs to stdout with structured formatting:
+```
+2024-12-25 10:00:00,123 INFO watcher: Fetch completed in 0.45s
+2024-12-25 10:00:30,456 INFO watcher: Processing feed with 15 entries
+2024-12-25 10:01:15,789 INFO notifier: SMS sent: SM1234567890abcdef
+```
 
 ## Troubleshooting
 
@@ -136,15 +169,6 @@ The service identifies index changes using these patterns:
 ### Performance Issues
 - Default 30-second polling interval can be adjusted via `POLL_INTERVAL_SEC`
 - Service uses connection pooling and conditional requests for efficiency
-
-## Logs
-
-The service logs to stdout with structured formatting:
-```
-2024-12-25 10:00:00,123 INFO watcher: Fetch completed in 0.45s
-2024-12-25 10:00:30,456 INFO watcher: Processing feed with 15 entries
-2024-12-25 10:01:15,789 INFO notifier: SMS sent: SM1234567890abcdef
-```
 
 ## Support
 

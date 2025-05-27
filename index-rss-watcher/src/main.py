@@ -1,8 +1,6 @@
 import asyncio, logging, sys, signal, os
 import warnings
-from .store import EntryStore
 from .watcher import FeedWatcher
-from .config import DB_PATH
 
 # Suppress urllib3 SSL warnings
 warnings.filterwarnings("ignore", message="urllib3.*", category=UserWarning)
@@ -16,8 +14,8 @@ logging.basicConfig(
 
 log = logging.getLogger("main")
 
-# Global shutdown flag
-shutdown_event = asyncio.Event()
+# Global shutdown flag - will be initialized in main()
+shutdown_event = None
 
 def signal_handler(signum, frame):
     """Handle shutdown signals gracefully"""
@@ -26,6 +24,9 @@ def signal_handler(signum, frame):
 
 async def main():
     """Main application entry point with error handling"""
+    global shutdown_event
+    shutdown_event = asyncio.Event()
+    
     try:
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, signal_handler)
@@ -35,14 +36,7 @@ async def main():
         
         # Initialize components
         try:
-            store = EntryStore(DB_PATH)
-            log.info(f"Database initialized: {DB_PATH}")
-        except Exception as e:
-            log.error(f"Failed to initialize database: {e}")
-            return 1
-        
-        try:
-            watcher = FeedWatcher(store)
+            watcher = FeedWatcher()
             log.info("RSS Watcher initialized")
         except Exception as e:
             log.error(f"Failed to initialize watcher: {e}")
