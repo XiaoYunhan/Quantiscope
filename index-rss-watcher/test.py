@@ -135,7 +135,8 @@ class TestSuite:
             # Track notifications
             original_send = Notifier.send
             notifications_sent = []
-            Notifier.send = lambda text, test_mode=False: notifications_sent.append(text) or True
+            def mock_send(text, **_): notifications_sent.append(text); return True
+            Notifier.send = mock_send
             
             try:
                 watcher._process_feed(rss_data.encode('utf-8'))
@@ -281,21 +282,21 @@ Link: https://example.com/test"""
         
     def _pass(self, message):
         """Record passed test"""
-        print(f"✅ {message}")
+        print(f"PASS: {message}")
         self.passed_tests += 1
         
     def _fail(self, message):
         """Record failed test"""
-        print(f"❌ {message}")
+        print(f"FAIL: {message}")
         self.failed_tests += 1
         
     def _info(self, message):
         """Print info message"""
-        print(f"ℹ️  {message}")
+        print(f"INFO: {message}")
         
     def _warn(self, message):
         """Print warning message"""
-        print(f"⚠️  {message}")
+        print(f"WARN: {message}")
 
 
 async def main():
@@ -306,7 +307,7 @@ async def main():
     if not success:
         sys.exit(1)
         
-    print("\n✅ All tests completed successfully!")
+    print("\nAll tests completed successfully!")
     
     # Print setup instructions
     print("\n📋 To run in production:")

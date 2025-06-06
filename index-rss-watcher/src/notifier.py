@@ -34,12 +34,12 @@ class Notifier:
     def send(cls, text: str, test_mode: bool = False) -> bool:
         """Send notification via SMS or voice call"""
         try:
-            if not TWILIO_FROM or not TWILIO_TO:
-                raise ValueError("Twilio phone numbers not configured. Please set TWILIO_FROM and TWILIO_TO in your .env file")
-            
             if test_mode:
                 log.info(f"TEST MODE: Would send notification: {text[:100]}...")
                 return True
+                
+            if not TWILIO_FROM or not TWILIO_TO:
+                raise ValueError("Twilio phone numbers not configured. Please set TWILIO_FROM and TWILIO_TO in your .env file")
                 
             client = cls._get_client()
             
