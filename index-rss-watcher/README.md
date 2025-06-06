@@ -4,12 +4,12 @@ A robust Python service that monitors S&P Global index RSS feeds for constituent
 
 ## Features
 
-- 🔍 **Smart RSS Monitoring**: Monitors S&P Global index news with intelligent filtering for constituent changes
-- 📱 **Multi-Channel Notifications**: Send alerts via SMS or voice calls using Twilio
-- ⚡ **High Performance**: Optimized feed parsing with conditional requests and connection pooling
-- 📄 **Persistent State**: CSV file to track processed entries and prevent duplicates
-- 🛡️ **Robust Error Handling**: Comprehensive error handling with retry logic and backoff
-- 🚀 **Fast Response**: Average processing time under 3ms per feed
+- **Smart RSS Monitoring**: Monitors S&P Global index news with intelligent filtering for constituent changes
+- **Multi-Channel Notifications**: Send alerts via SMS or voice calls using Twilio
+- **High Performance**: Optimized feed parsing with conditional requests and connection pooling
+- **Persistent State**: CSV file to track processed entries and prevent duplicates
+- **Robust Error Handling**: Comprehensive error handling with retry logic and backoff
+- **Fast Response**: Average processing time under 3ms per feed
 
 ## Quick Start
 
