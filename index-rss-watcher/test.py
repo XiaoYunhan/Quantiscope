@@ -28,7 +28,7 @@ class TestSuite:
         
     async def run_all_tests(self):
         """Run all tests in sequence"""
-        print("🧪 Index RSS Watcher Test Suite")
+        print("Index RSS Watcher Test Suite")
         print("=" * 60)
         
         # Setup test environment
@@ -45,7 +45,7 @@ class TestSuite:
         
         # Summary
         print("\n" + "=" * 60)
-        print(f"📊 Test Summary: {self.passed_tests} passed, {self.failed_tests} failed")
+        print(f"Test Summary: {self.passed_tests} passed, {self.failed_tests} failed")
         return self.failed_tests == 0
     
     def setup_test_environment(self):
@@ -67,7 +67,7 @@ class TestSuite:
     
     async def test_rss_watcher(self):
         """Test RSS watcher core functionality"""
-        print("\n📰 Testing RSS Watcher")
+        print("\nTesting RSS Watcher")
         print("-" * 40)
         
         watcher = FeedWatcher()
@@ -95,7 +95,7 @@ class TestSuite:
             
     async def test_filtering_logic(self):
         """Test RSS entry filtering for 'replace' keyword"""
-        print("\n🔍 Testing Filtering Logic (Simple 'replace' filter)")
+        print("\nTesting Filtering Logic (Simple 'replace' filter)")
         print("-" * 40)
         
         watcher = FeedWatcher()
@@ -150,7 +150,7 @@ class TestSuite:
                 
     async def test_csv_storage(self):
         """Test CSV storage functionality"""
-        print("\n💾 Testing CSV Storage")
+        print("\nTesting CSV Storage")
         print("-" * 40)
         
         # Start fresh for this test
@@ -197,23 +197,31 @@ class TestSuite:
             
     async def test_notifier(self):
         """Test notification system"""
-        print("\n📱 Testing Notification System")
+        print("\nTesting Notification System")
         print("-" * 40)
         
         # Test 1: Credential validation
         print("1. Testing Twilio credentials...")
-        try:
-            is_valid = Notifier.test_credentials()
-            if is_valid:
-                self._pass("Twilio credentials are valid")
-            else:
+        
+        # Skip credential test in CI environment
+        if os.environ.get('CI') == 'true':
+            self._info("Skipping credential test in CI environment")
+        else:
+            try:
+                is_valid = Notifier.test_credentials()
+                if is_valid:
+                    self._pass("Twilio credentials are valid")
+                else:
+                    self._info("Twilio credentials not configured (expected in test environment)")
+            except ValueError as e:
+                # This is expected when credentials are not configured
                 self._info("Twilio credentials not configured (expected in test environment)")
-        except Exception as e:
-            self._info(f"Credential test skipped: {e}")
+            except Exception as e:
+                self._fail(f"Unexpected error during credential test: {e}")
             
         # Test 2: Test mode
         print("\n2. Testing notification in test mode...")
-        test_message = """🚨 Index Change Alert
+        test_message = """Index Change Alert
 Title: S&P 500 Index Constituent Changes
 Published: Mon, 25 Dec 2024 10:00:00 GMT
 Link: https://example.com/test"""
